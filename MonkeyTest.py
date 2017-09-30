@@ -11,8 +11,11 @@ import time
 
 import SnapScreen as snap
 
+# Devices ID
+Device_Id = 'A63000030'
 # hours
-Run_Time = 10
+Run_Time = 48
+
 # 发送Event数量
 events = 50000
 
@@ -44,7 +47,7 @@ pct_majornav = False
 pct_syskeys = False
 
 # 启动Activity的百分比。在随机间隔里，Monkey将执行一个startActivity()调用，作为最大程度覆盖包中全部Activity的一种方法
-pct_appswitch = False
+pct_appswitch = 30
 
 # 调整其它类型事件的百分比。它包罗了所有其它类型的事件，如：按键、其它不常用的设备按钮、等等。
 pct_anyevent = False
@@ -112,7 +115,7 @@ logger.addHandler(ch)
 
 adb_command = ''
 cpath = sys.path[0]
-print "cpath：", cpath
+print("cpath：", cpath)
 
 # 格式化Log等级，一个-v最低，三个-v最高
 if log_lev is 3:
@@ -131,14 +134,13 @@ else:
 
 # Black/white list, white list with a higher priority.
 if whitelist is True:
-    push_white = 'adb push {}/data/white.txt /sdcard/white.txt'.format(cpath)
+    push_white = 'adb -s {} push {}/data/white.txt /sdcard/white.txt'.format(Device_Id, cpath)
     if os.system(push_white) == 0:
         adb_command += '--pkg-whitelist-file /sdcard/white.txt '
 elif blacklist is True:
-    push_black = 'adb push {}/data/black.txt /sdcard/black.txt'.format(cpath)
+    push_black = 'adb -s {} push {}/data/black.txt /sdcard/black.txt'.format(Device_Id, cpath)
     if os.system(push_black) == 0:
         adb_command += '--pkg-blacklist-file /sdcard/black.txt '
-
 
 # formart time interval between events.
 if throttle is False:
@@ -218,15 +220,15 @@ def chkPower():
     '''
     Use the "adb shell dumpsys battery" command to get battery level, return int value.
     '''
-    cmd = ['adb', 'shell', 'dumpsys', 'battery', '|', 'grep', 'level']
+    cmd = 'adb -s {} shell dumpsys battery | grep level'.format(Device_Id)
     run = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     batt = run.stdout.read()
     if "level" not in batt:
-        print "Query battery information failed!"
+        logger.info("Query battery information failed!")
         return False
     else:
         getvalue = batt.split(':')[1].strip()
-        print "Battery level : " + getvalue
+        logger.info("Battery level : %s", getvalue)
         return int(getvalue)
 
 
@@ -237,24 +239,25 @@ def chkDevices():
     1: ONE device connection
     2: TWO or MORE devices connected
     '''
-    cmd = ['adb', 'devices']
-    run = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    getvalue = run.stdout.readlines()
-    count = len(getvalue)
-    # print getvalue
-    if count == 3:
-        sn = getvalue[1].split('device')[0].strip()
-        # print sn
-        logger.info('Device ID: %s', sn)
+    cmd = 'adb devices'
+    run = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    getvalue = run.stdout.read()
+    if Device_Id in getvalue:
         return 1
-    elif count > 3:
-        logger.warning('Multiple devices connected.')
-        for i in getvalue[1:-1]:
-            logger.info(i)
-        return 2
-    else:
-        logger.warning('No devices is connected.')
-        # return 0
+
+            # if count == 3:
+            #     sn = getvalue[1].split('device')[0].strip()
+            #     # print(sn)
+            #     logger.info('Device ID: %s', sn)
+            #     return 1
+            # elif count > 3:
+            #     logger.warning('Multiple devices connected.')
+            #     for i in getvalue[1:-1]:
+            #         logger.info(i)
+            #     return 2
+            # else:
+            #     logger.warning('No devices is connected.')
+            #     return 0
 
 
 # ------------------Test start, mark start time.--------------------
@@ -263,7 +266,7 @@ start_time = time.time()
 
 now = cur_times('datetime')
 Result_path = '{}/MonkeyResult/{}'.format(cpath, now)
-print 'Result path:', Result_path
+logger.info('Result path: %s', Result_path)
 
 # set start times.
 n = 1
@@ -277,9 +280,9 @@ while int(time.time() - start_time) <= Run_Time * 3600:
         sys.exit()  # Currently, multi-device operation is not supported.
     if batt_level < 10:  # check Android power.
         logger.info('The battery level is %s, start charge.', batt_level)
-        os.system('adb shell input keyevent POWER')
+        os.system('adb -s {} shell input keyevent POWER'.format(Device_Id))
         time.sleep(1800)
-        os.system('adb shell input keyevent POWER')
+        os.system('adb -s {} shell input keyevent POWER'.format(Device_Id))
     elif not batt_level:
         logger.warning("Query battery information failed!")
         sys.exit()
@@ -288,10 +291,10 @@ while int(time.time() - start_time) <= Run_Time * 3600:
     md_path(Result_path)
     logger.info('Times: %s ', n)
     Event_Log = Result_path.replace('\\', '/') + \
-        '/MonkeyEvents_{}.log'.format(cur_times('time'))
+                '/MonkeyEvents_{}.log'.format(cur_times('time'))
     Event_Log_Flie = open(Event_Log, 'w')
-    #-------------use subprocess run command--------------
-    run_monkey = 'adb shell monkey {}{}'.format(adb_command, events)
+    # -------------use subprocess run command--------------
+    run_monkey = 'adb -s {} shell monkey {}{}'.format(Device_Id, adb_command, events)
     logger.info('Monkey Command is: %s', run_monkey)
     start = subprocess.Popen(run_monkey.split(),
                              stdout=Event_Log_Flie,
@@ -301,12 +304,15 @@ while int(time.time() - start_time) <= Run_Time * 3600:
 
     # snap screen.
     logger.info("Find Exception, snap screen.")
-    snap.androidScreencap(Result_path)
+    snap.androidScreencap(Deviceid=Device_Id, path=Result_path)
     # take bugreport.
     logger.info("Pull bugreport ......")
-    bugreport = 'adb bugreport {}'.format(Result_path)
+    bugreport = 'adb -s {} bugreport {}'.format(Device_Id, Result_path)
     # logger.info(bugreport)
     os.system(bugreport)
     logger.info('Wait a minute.')
     time.sleep(5)
     n += 1
+else:
+    logger.warning("Set Time To End!")
+    sys.exit()

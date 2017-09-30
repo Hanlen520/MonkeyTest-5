@@ -4,23 +4,25 @@ import sys
 import time
 
 
-def androidScreencap(path=0):
+def androidScreencap(Deviceid='', path=0):
     localTime = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
     remote_obj = '/sdcard/%s.png' % localTime
+
     if path:
         local_obj = path
     else:
         local_obj = sys.path[0]
 
-    print remote_obj, local_obj
-    snap = 'adb shell screencap -p %s' % remote_obj
-    pullPic = 'adb pull %s %s' % (remote_obj, local_obj)
-    print "run command: ", pullPic
+    print(remote_obj, local_obj)
+    if Deviceid:
+        snap = 'adb -s {} shell screencap -p {}'.format(Deviceid, remote_obj)
+        pullPic = 'adb -s {} pull {} {}'.format(Deviceid, remote_obj, local_obj)
+        print("run command: ", pullPic)
 
-    os.system(snap)
-    os.system(pullPic)
+        os.system(snap)
+        os.system(pullPic)
 
-    print 'OK.'
+        print('OK.')
 
 
 if __name__ == '__main__':
