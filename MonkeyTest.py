@@ -47,7 +47,7 @@ pct_majornav = False
 pct_syskeys = False
 
 # 启动Activity的百分比。在随机间隔里，Monkey将执行一个startActivity()调用，作为最大程度覆盖包中全部Activity的一种方法
-pct_appswitch = 30
+pct_appswitch = False
 
 # 调整其它类型事件的百分比。它包罗了所有其它类型的事件，如：按键、其它不常用的设备按钮、等等。
 pct_anyevent = False
@@ -134,11 +134,13 @@ else:
 
 # Black/white list, white list with a higher priority.
 if whitelist is True:
-    push_white = 'adb -s {} push {}/data/white.txt /sdcard/white.txt'.format(Device_Id, cpath)
+    push_white = 'adb -s {} push {}/data/white.txt /sdcard/white.txt'.format(
+        Device_Id, cpath)
     if os.system(push_white) == 0:
         adb_command += '--pkg-whitelist-file /sdcard/white.txt '
 elif blacklist is True:
-    push_black = 'adb -s {} push {}/data/black.txt /sdcard/black.txt'.format(Device_Id, cpath)
+    push_black = 'adb -s {} push {}/data/black.txt /sdcard/black.txt'.format(
+        Device_Id, cpath)
     if os.system(push_black) == 0:
         adb_command += '--pkg-blacklist-file /sdcard/black.txt '
 
@@ -240,24 +242,11 @@ def chkDevices():
     2: TWO or MORE devices connected
     '''
     cmd = 'adb devices'
-    run = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    run = subprocess.Popen(
+        cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     getvalue = run.stdout.read()
     if Device_Id in getvalue:
         return 1
-
-            # if count == 3:
-            #     sn = getvalue[1].split('device')[0].strip()
-            #     # print(sn)
-            #     logger.info('Device ID: %s', sn)
-            #     return 1
-            # elif count > 3:
-            #     logger.warning('Multiple devices connected.')
-            #     for i in getvalue[1:-1]:
-            #         logger.info(i)
-            #     return 2
-            # else:
-            #     logger.warning('No devices is connected.')
-            #     return 0
 
 
 # ------------------Test start, mark start time.--------------------
@@ -291,10 +280,20 @@ while int(time.time() - start_time) <= Run_Time * 3600:
     md_path(Result_path)
     logger.info('Times: %s ', n)
     Event_Log = Result_path.replace('\\', '/') + \
-                '/MonkeyEvents_{}.log'.format(cur_times('time'))
+        '/MonkeyEvents_{}.log'.format(cur_times('time'))
     Event_Log_Flie = open(Event_Log, 'w')
+
+    # get logcat
+    get_logcat_cmd = 'adb -s {} logcat'.format(Device_Id)
+    logcat_file = Result_path + '\\logcat_{}.log'.format(cur_times('time'))
+    with open(logcat_file, 'w') as log:
+        logcat = subprocess.Popen(
+            get_logcat_cmd.split(), stdout=log, stderr=subprocess.PIPE)
+    logger.info('Logcat PID: %s', logcat.pid)
+
     # -------------use subprocess run command--------------
-    run_monkey = 'adb -s {} shell monkey {}{}'.format(Device_Id, adb_command, events)
+    run_monkey = 'adb -s {} shell monkey {}{}'.format(
+        Device_Id, adb_command, events)
     logger.info('Monkey Command is: %s', run_monkey)
     start = subprocess.Popen(run_monkey.split(),
                              stdout=Event_Log_Flie,
@@ -310,9 +309,12 @@ while int(time.time() - start_time) <= Run_Time * 3600:
     bugreport = 'adb -s {} bugreport {}'.format(Device_Id, Result_path)
     # logger.info(bugreport)
     os.system(bugreport)
+
+    logcat.kill()  # 结束logcat进行
+
     logger.info('Wait a minute.')
     time.sleep(5)
     n += 1
 else:
-    logger.warning("Set Time To End!")
+    logger.warning("Works done!")
     sys.exit()
